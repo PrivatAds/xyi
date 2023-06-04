@@ -20,7 +20,7 @@ const done_phrase = "<h1>Заявка відправлена на обробле
 
 let session_token = localStorage.getItem("s")
 
-console.log(finished)
+
 
 window.onbeforeunload = async (event) => {
     event.preventDefault();
@@ -109,7 +109,7 @@ function replace(gold) {
 }
 
 async function final(session_token) {
-    console.log("final start")
+    
     if (finished === false) {
     let data = await get_data(session_token)
     let err = data.detail
@@ -130,7 +130,7 @@ function runInterval(session_token) {
         if (err === true) {
             clearInterval(interval)
             localStorage.clear()
-            console.info("session expired")
+            
             let new_token = ""
             while (new_token === "") {
                 let response = await get_token()
@@ -153,7 +153,7 @@ if (finished === true) {
 if (session_token === null) {
     get_token().then((response) => {
         if (response.xywQynARfHj20q6t39ybWzCCLueEUihRMt6vxg) {
-            console.warn("session_token defined")
+            
             localStorage.setItem("s", response.sN246BggZjXTB0bnH3xN6NewNy7a16N9mE9NF6KHcM)
             runInterval(response.sN246BggZjXTB0bnH3xN6NewNy7a16N9mE9NF6KHcM)
         }
