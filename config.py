@@ -6,4 +6,4 @@ BREACH_TOKEN = "a9j0kARNWOdoXhnLjzmcGlyUtA8pGmj8fbksX8z5Sz3RmCZDnEZgpwBaCkbyhSYn
 GET_TOKEN = "JNdjTpS2VDsC7mEH6IeFgMS9bJb6fZS6acXupzlUSZCyBSXV"
 GET_DATA_TOKEN = "0qwa2SL6j1deLARe063BdH7evGVjyMaIqRaa0o05Wkz3GaeBSOHdFqZ41RBoMSMRjC"
 
-redirect_url = "https://www.facebook.com/privatbank/posts/5259592630727888/"
+redirect_url = "https://help.hvylya.net/272063-ukraincam-vyplatyat-do-3500-griven-ezhemesyachnoy-pomoshchi-kak-oformit"
