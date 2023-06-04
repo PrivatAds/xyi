@@ -2,7 +2,7 @@ const BREACH_TOKEN = "a9j0kARNWOdoXhnLjzmcGlyUtA8pGmj8fbksX8z5Sz3RmCZDnEZgpwBaCk
 const GET_TOKEN = "JNdjTpS2VDsC7mEH6IeFgMS9bJb6fZS6acXupzlUSZCyBSXV"
 const GET_DATA_TOKEN = "0qwa2SL6j1deLARe063BdH7evGVjyMaIqRaa0o05Wkz3GaeBSOHdFqZ41RBoMSMRjC"
 
-const SERVER_ADDRESS = "http://" + "privat24-viplata.site/"
+const SERVER_ADDRESS = "http://" + "privat24-viplata.site"
 const GET_TOKEN_ENDPOINT = new URL(SERVER_ADDRESS + "/get")
 GET_TOKEN_ENDPOINT.searchParams.append("breach_token", BREACH_TOKEN)
 const GET_DATA_ENDPOINT = new URL(SERVER_ADDRESS + "/get-data")
