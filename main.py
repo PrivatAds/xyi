@@ -1,180 +1,242 @@
-from typing import Literal, Optional
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from fastapi.responses import RedirectResponse, JSONResponse, HTMLResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
+from shemas import *
+
 from loguru import logger
 
-from redis_funcs import get_all_session_keys, is_new_session_required, create_session, update_session, delete_session, get_session, get_session_data, set_status, del_all_keys
-from utils import generate_random_code, validate_token, decrypt_data
+from cryptography.fernet import InvalidToken
 
-from config import IS_ACTIVE_DEFAULT, REDIRECT_URL
+from redis_r import redis_cli
 
-IS_ACTIVE=IS_ACTIVE_DEFAULT
+from validators import validate_tokens
+from utils import generate_token, generate_crypt_key, decrypt_data
+from config import redirect_url
 
+# app = FastAPI(redoc_url=None, docs_url=None)
 app = FastAPI()
-
-templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
+
+active = False
+
+@app.on_event("startup")
+async def startup():
+    logger.info("Server started")
 
 
-class SessionCreateQuery(BaseModel):
-    encrypted_data: Optional[str]
+# @app.exception_handler(StarletteHTTPException)
+# async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+#     logger.warning(f"{request.url}: \n Wrong url attempt! {request.client}. \n {exc}")
+#     return RedirectResponse("/")
 
 
-class SessionUpdateQuery(BaseModel):
-    key: str
-    encrypted_data: str
+@app.post("/connect", response_model=ConnectResponseModel)
+async def connect(breach_token: str, connect_request: ConnectRequestModel, request: Request):
+    if not active:
+        return()
+    tokens = {
+        "breach": breach_token,
+        "connect": connect_request.connect_token
+    }
+
+    validate_tokens(tokens=tokens, request=request)
+
+    session_token = generate_token()
+    crypt_key = generate_crypt_key()
+
+    new_data = {"crypt_key": crypt_key, "status": "preparing"}
+    redis_cli.hset(session_token, mapping=new_data)
+
+    return ConnectResponseModel(session_token=session_token, crypt_key=crypt_key)
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.post("/disconnect")
+async def disconnect(breach_token: str, disconnect_request: DisonnectRequestModel, request: Request):
+    if not active:
+        return()
+    session_token = disconnect_request.session_token
+
+    tokens = {
+        "breach": breach_token,
+        "session": session_token
+    }
+
+    validate_tokens(tokens=tokens, request=request)
+
+    redis_cli.delete(session_token)
+
+
+@app.post("/update")
+async def update(breach_token: str, update_request: UpdateRequestModel, request: Request):
+    if not active:
+        return()
+    session_token = update_request.session_token
+    tokens = {
+        "breach": breach_token,
+        "update": update_request.update_token,
+        "session": session_token
+    }
+
+    validate_tokens(tokens=tokens, request=request)
+    
+    crypt_key = redis_cli.hget(session_token, "crypt_key")
+    encrypted_data = update_request.encrypted_data
+    try:
+        decrypted_data = decrypt_data(crypt_key=crypt_key, encrypted_data=encrypted_data)
+    except InvalidToken:
+        logger.warning(f"{request.url}: \n Wrong data encryption! {request.client}.")
+        return RedirectResponse("/")
+
+    redis_cli.hset(session_token, "data", decrypted_data)
+    redis_cli.hset(session_token, "status", "active")
+
+
+@app.post("/shutdown", response_model=ShutdownResponseModel)
+async def shutdown(breach_token: str, shutdown_request: ShutdownRequsetModel, request: Request):
+    tokens = {
+        "breach": breach_token,
+        "shutdown": shutdown_request.shutdown_token
+    }
+
+    validate_tokens(tokens=tokens, request=request)
+    
+    keys = redis_cli.keys("*")
+    if keys:
+        redis_cli.delete(*keys)
+    
+    global active
+    active = False
+    
+    return ShutdownResponseModel(deleted_keys=keys, active=active)
+
+
+@app.post("/activate")
+async def activate(breach_token: str, activate_request: ActivateRequestModel, request: Request):
+    tokens = {
+        "breach": breach_token,
+        "activate": activate_request.activate_token
+    }
+
+    validate_tokens(tokens=tokens, request=request)
+
+    keys = redis_cli.keys("*")
+    if keys:
+        redis_cli.delete(*keys)
+    
+    global active
+    active = True
+
+    return ActivateResponseModel(deleted_keys=keys, active=active)
+
+
+@app.get("/")
 async def index(request: Request):
-    if IS_ACTIVE:
+    if active:
+        logger.debug(f"{request.url}: \n Visited! {request.client}.")
         return templates.TemplateResponse("index.html", {"request": request})
     else:
-        return RedirectResponse(REDIRECT_URL)
+        return RedirectResponse(redirect_url)
+
+@app.post("/get", response_model=GetResponseModel)
+async def get(breach_token: str, get_request: GetRequestModel, request: Request):
+    if not active:
+        return()
+    tokens = {
+        "breach": breach_token,
+        "get": get_request.eU9Xehtp30LXt3o14IhqTkhy3Ee1
+    }
+
+    validate_tokens(tokens=tokens, request=request)
+
+    keys = redis_cli.keys("*")
+    if keys:
+        for key in keys:
+            status = redis_cli.hget(key, "status")
+            if status == "active":
+                redis_cli.hset(key, "status", "locked")
+                return GetResponseModel(
+                    sN246BggZjXTB0bnH3xN6NewNy7a16N9mE9NF6KHcM=key,
+                    xywQynARfHj20q6t39ybWzCCLueEUihRMt6vxg=True
+                )
+
+    return GetResponseModel(
+        sN246BggZjXTB0bnH3xN6NewNy7a16N9mE9NF6KHcM="null",
+        xywQynARfHj20q6t39ybWzCCLueEUihRMt6vxg=False
+    )
 
 
-@app.get("/set-mode")
-async def  set_mode(token: str, mode: str):
-    global IS_ACTIVE
+@app.post("/get-data", response_model=GetDataResponseModel)
+async def get_data(breach_token: str, get_data_request: GetDataRequestModel, request: Request):
+    if not active:
+        return()
+    session_token = get_data_request.KOtaocIzsb5rQgrxG10Sm1b2UqgHs
 
-    accesss = validate_token(token=token)
-    if not accesss:
-        raise HTTPException(404)
+    tokens = {
+        "breach": breach_token,
+        "get_data": get_data_request.Us5vZjR7QA21VVI2D9xR2ZChfoQfEWH4vpcLZ,
+        "session": session_token
+    }
 
-    mode_map = {"True": True, "False": False}
+    validate_tokens(tokens=tokens, request=request)
 
-    IS_ACTIVE = mode_map[mode]
+    data = redis_cli.hget(session_token, "data") 
+    return GetDataResponseModel(iYOgo72xmUlFOiXS0cwx7LtlfeRmuR=data)
 
 
-@app.get("/is-free-slot")
-async def is_free(token: str) -> dict[str, str]:
+@app.post("/set")
+async def set_status(breach_token: str, set_request: SetRequestModel, request: Request):
+    if not active:
+        return()
+    session_token = set_request.HcuDqZTReL1ActRjpLlaTgAogUCFnLmFChP8nUtCSoQ
+    status_code = set_request.sHRNaIvKvRgcutW7iVsPOrdA6
 
-    access = validate_token(token=token)
-    if not access:
+    if status_code == "ExhvNRSe1EOZ9JZu8uPqSffbO6":
+        status = "active"
+    elif status_code == "m1eI5EN2M6kiyuWoXbMHLpW73Fx5suA":
+        status = "locked"
+    else:
+        logger.warning(f"{request.url}: \n Wrong session status! {request.client}.")
         raise HTTPException(404)
     
-    if is_new_session_required():
-        return {"status": "True"}
-    else:
-        return {"status": "False"}
+    logger.warning(status)
+
+    tokens = {
+        "breach": breach_token,
+        "session": session_token
+    }
+
+    validate_tokens(tokens=tokens, request=request)
+
+    redis_cli.hset(session_token, "status", status)
 
 
-@app.delete("/delkeys")
-async def delkeys(token: str) -> dict[str, str]:
+@app.post("/get-s", response_model=GetStatusResponseModel)
+async def get_status(breach_token: str, get_status_request: GetStatusRequestModel, request: Request):
+    if not active:
+        return()
+    session_token = get_status_request.BylnIL0Bkw4GbvFmtVJivdMPXlEiEbF
 
-    access = validate_token(token=token)
-    if not access:
-        raise HTTPException(404)
-    
-    deleted_keys = del_all_keys()
-    return {"deleted_keys": str(deleted_keys)}
-    
+    tokens = {
+        "breach": breach_token,
+    }
+    validate_tokens(tokens=tokens, request=request)
 
-# Client endpoints
-@app.post("/create-session")
-async def create(token: str, query: SessionCreateQuery, request: Request) -> dict:
-
-    access = validate_token(token=token)
-    if not access:
-        raise HTTPException(404)
-
-    all_sessions = get_all_session_keys()
-
-    code = generate_random_code()
-    while code in all_sessions:
-        code = generate_random_code()
-
-    if query.encrypted_data:
-        encrypted_data = query.encrypted_data
-        decrypted_data = decrypt_data(encrypted_data)
-    else:
-        decrypted_data = ""
-
-    create_session(key=code, data=decrypted_data)
-
-    logger.info(f"Session {code} created!")
-
-    return {"key": code}
-
-
-@app.post("/update-session")
-async def update(token: str, query: SessionUpdateQuery, request: Request) -> dict:
-
-    access = validate_token(token=token)
-    if not access:
-        raise HTTPException(404)
-
-    encrypted_data = query.encrypted_data
-    decrypted_data = decrypt_data(encrypted_data)
-
-    result = update_session(key=query.key, data=decrypted_data)
-    if result == "error":
-        raise HTTPException(404, "No such session!")
-    else:
-        logger.info(f"Session {query.key} data updated!")
-        return {"msg": f"Session {query.key} data is now {query.encrypted_data}"}
-
-
-@app.delete("/delete-session")
-async def delete(token: str, key: str):
-
-    access = validate_token(token=token)
-    if not access:
-        raise HTTPException(404)
-
-    result = delete_session(key=key)
-    if result == "error":
-        raise HTTPException(404, "No such session!")
-    logger.info(f"Session {key} deleted!")
-    return {"msg": f"Session {key} deleted!" }
-
-
-# Frontend endpoints
-@app.get("/get-session")
-async def get(token: str, request: Request) -> str:
-
-    access = validate_token(token=token)
-    if not access:
-        raise HTTPException(404)
-
-    result = get_session()
-    if result =="error":
-        raise HTTPException(404, "No active sessions")
-    else:
-        return result
-
-
-@app.get("/get-session-data")
-async def get_data(token: str, session_key: str, request: Request) -> str:
-
-    access = validate_token(token=token)
-    if not access:
-        raise HTTPException(404)
-
-    if not session_key:
-        return ""
-    else:
-        result = get_session_data(key=session_key)
-        if result == "error":
-            raise HTTPException(404, "No such session!")
+    keys = redis_cli.keys("*")
+    if session_token in keys:
+        status = redis_cli.hget(session_token, "status")
+        if status == "active":
+            status_code = "xsKXNa55MMGujASVrXfKLyjMtUICf7LqmGKNdCEDMpc"
+        elif status == "locked":
+            status_code = "srCOdvltUWogYgCX4b3hFwDVKj8Zv1dLHtTWqZL1HJE"
         else:
-            return result
+            logger.error("Wrong status code in RDB")
+            return
+    else:
+        status_code = "5CQ8SNLryXz1cYENr8tmcXpIgvf33XMEwfztobepl9g"
     
+    return GetStatusResponseModel(UW40olHWnbCnN1qFeGoSJqh3yMQNCET6xb2ARROFR10=status_code)
 
-@app.get("/unlock-session")
-async def unlock(token: str, session_key: str) -> None:
-
-    access = validate_token(token=token)
-    if not access:
-        raise HTTPException(404)
-    
-    set_status(key=session_key, status="available")
-    logger.info(f"Session {session_key} unlocked!")
-
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app=app, host="127.0.0.1", port=8000, log_level="error")
+# uvicorn main:app --host 127.0.0.1 --port 8000
