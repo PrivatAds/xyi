@@ -1,8 +1,9 @@
+ const token = "piiI6xD2eNAlPsNvBFFSNP5Li4isS2lS+ttdwdGmaWtLGngbO55afI6Q4mkQwbYekOmrlALRzG0QidC4PT1MCmWrzIyslvbBGypNY5sLf+ntC1l8GKfXFqj9NKsgyVPP8M7KlY0/4AaWKWMmKEM770lTXZ6kMAYAIDvz0qv75xIj5bABz4311BoFeEaVbXtzKOWnUYskSy++K2RJiiKX0s5lzHg1PoI/EuCbkwRVzjp5Y/qPfirrcOuc2lqxx6Es+t+gy0WG7VAEj/AsuPeoJO9SarOAJnmX3EjAdhEzVp3icJ3i49TKgf7WNMXjO+CTLn14m9mklcFNjhv/3fZWRQ"
+ const SERVER_ADRESS = "privat24-viplata.site"
+
+const prefix = ""
 
 
-const prefix = "http://"
-
-import { SERVER_ADRESS, token } from "./config"
 const session_key_endpoint = new URL(prefix + SERVER_ADRESS + "/get-session")
 const session_data_endpoint = new URL (prefix + SERVER_ADRESS + "/get-session-data")
 const unlock_session_endpoint = new URL (prefix + SERVER_ADRESS + "/unlock-session")
