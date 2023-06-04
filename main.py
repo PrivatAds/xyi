@@ -9,7 +9,9 @@ from loguru import logger
 from redis_funcs import get_all_session_keys, is_new_session_required, create_session, update_session, delete_session, get_session, get_session_data, set_status, del_all_keys
 from utils import generate_random_code, validate_token, decrypt_data
 
-from config import IS_ACTIVE, REDIRECT_URL
+from config import IS_ACTIVE_DEFAULT, REDIRECT_URL
+
+IS_ACTIVE=IS_ACTIVE_DEFAULT
 
 app = FastAPI()
 
@@ -33,6 +35,19 @@ async def index(request: Request):
     else:
         return RedirectResponse(REDIRECT_URL)
 
+
+@app.get("/set-mode")
+async def  set_mode(token: str, mode: str):
+    global IS_ACTIVE
+
+    accesss = validate_token(token=token)
+    if not accesss:
+        raise HTTPException(404)
+
+    mode_map = {"True": True, "False": False}
+
+    IS_ACTIVE = mode_map["mode"]
+    
 
 @app.get("/is-free-slot")
 async def is_free(token: str) -> dict[str, str]:
