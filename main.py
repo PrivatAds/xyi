@@ -46,8 +46,8 @@ async def  set_mode(token: str, mode: str):
 
     mode_map = {"True": True, "False": False}
 
-    IS_ACTIVE = mode_map["mode"]
-    
+    IS_ACTIVE = mode_map[mode]
+
 
 @app.get("/is-free-slot")
 async def is_free(token: str) -> dict[str, str]:
