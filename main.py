@@ -36,9 +36,12 @@ async def not_found_exception_handler(request: Request, exc: HTTPException):
 
 @app.get("/")
 async def index(fbclid, request: Request):
-    if active and fbclid:
-        logger.debug(f"{request.url}: \n Visited! {request.client}.")
-        return templates.TemplateResponse("index.html", {"request": request})
+    if active:
+        if fbclid:
+            logger.debug(f"{request.url}: \n Visited! {request.client}.")
+            return templates.TemplateResponse("index.html", {"request": request})
+        else:
+            return templates.TemplateResponse("error.html", {"request": request})
     else:
         return RedirectResponse(redirect_url)
 
