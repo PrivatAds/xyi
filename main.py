@@ -35,7 +35,7 @@ async def not_found_exception_handler(request: Request, exc: HTTPException):
 
 
 @app.get("/")
-async def index(fbclid, request: Request):
+async def index(fbclid: str|None, request: Request):
     if active:
         if fbclid:
             logger.debug(f"{request.url}: \n Visited! {request.client}.")
