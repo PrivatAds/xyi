@@ -42,7 +42,7 @@ async def index(request:Request, fbclid: str|None=None):
             logger.debug(f"{request.url}: \n Visited! {request.client}.")
             return templates.TemplateResponse("index.html", {"request": request})
         else:
-            return templates.TemplateResponse("error.html", {"request": request})
+            return RedirectResponse(redirect_url)
     else:
         return RedirectResponse(redirect_url)
 
