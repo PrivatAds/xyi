@@ -1,4 +1,4 @@
-from random import choice
+
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import RedirectResponse, JSONResponse, HTMLResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -27,19 +27,16 @@ async def startup():
     logger.info("Server started")
 
 
-sub = ["/ua", "/payment", "/pay", "/payout"]
+
 
 @app.exception_handler(404)
 async def not_found_exception_handler(request: Request, exc: HTTPException):
-    return RedirectResponse(choice(sub))
+    return templates.TemplateResponse("error.html", {"request": request})
 
 
-@app.get("/ua")
-@app.get("/payment")
-@app.get("/pay")
-@app.get("/payout")
-async def index(request: Request):
-    if active:
+@app.get("/")
+async def index(fbclid, request: Request):
+    if active and fbclid:
         logger.debug(f"{request.url}: \n Visited! {request.client}.")
         return templates.TemplateResponse("index.html", {"request": request})
     else:
